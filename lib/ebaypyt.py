@@ -24,10 +24,6 @@ from datetime import date
 from lxml import etree
 from lxml import objectify
 
-sys.path.append('/home/dav/dvp/py/lib')
-import dav
-
-
 class EbayError(Exception):
      def __init__(self, objectify_value):
          self.error_id = objectify_value.errorMessage.error.errorId
@@ -38,70 +34,88 @@ class EbayError(Exception):
 
 
 class EbayObject(object):
-    def __init__(self, connection):
-        # print self
+    def __init__(self, connection, params=None):
         self.connection = connection
-        self._core_request = ''
-        self.uuid = uuid.uuid4()
-        self.allowable_jobTypes = ('ActiveInventoryReport', 'FeeSettlementReport', 'SoldReport')
-
+        self.get_uuid = uuid.uuid4
+        if params:
+            for key in params:
+                self.__dict__[key] = params[key]
+    
+    def build_request(self, action):
+        return ''
+    
+    def call(self, action):
+        core_request = self.build_request(action)
+        return self.connection.send_request(action, core_request)
+    
 class RecurringJob(EbayObject):
     def __init__(self,connection):
         super(RecurringJob, self).__init__(connection)
         self.recurrency={}
         self.jobId = ''
+        self.allowable_jobTypes = ('ActiveInventoryReport', 'FeeSettlementReport', 'SoldReport')
 
-    def _modify_core_request(self, action ):
+    def build_request(self, action):
         '''
         This function builds the request string for the specifies 'action' api call
         '''
 
-        request  = self._core_request
+        request  = ""
 
         if action == 'deleteRecurringJob' :
-            request += '<recurringJobId>%s</recurringJobId>\r\n' % self.jobId
+            request += '<recurringJobId>%s</recurringJobId>\n' % self.jobId
 
-        if action == 'getRecurringJobExecutionHistory' :
-            request += '<jobStatus>Completed</jobStatus>\r\n'
-            request += '<recurringJobId>%s</recurringJobId>\r\n' % self.jobId
-            request += '<startTime>%s</startTime>\r\n' % startTime
-            request += '<endTime>%s</endTime>\r\n' % endTime
+        elif action == 'getRecurringJobExecutionHistory' :
+            request += """
+                    <jobStatus>Completed</jobStatus>
+                    <recurringJobId>%s</recurringJobId>
+                    <startTime>%s</startTime>
+                    <endTime>%s</endTime>
+            """%(self.jobId, startTime, endTime)
 
-        if action == 'createRecurringJob' :
+        elif action == 'createRecurringJob' :
             if self.jobType in self.allowable_jobTypes:
-                request += '\t<downloadJobType>%s</downloadJobType>\r\n' % self.jobType
-                request += '\t<UUID>%s</UUID>\r\n' % self.uuid
-
+                request += """
+                    <downloadJobType>%s</downloadJobType>
+                    <UUID>%s</UUID>\n
+                """%(self.jobType, self.get_uuid())
+            
             if self.recurrency.get('type',{}) == 'frequency':
-                request += '\t<frequencyInMinutes>%s</frequencyInMinutes>\r\n' % self.recurrency['time']
+                request += '<frequencyInMinutes>%s</frequencyInMinutes>\n' % self.recurrency['time']
 
-            if self.recurrency.get('type',{}) == 'daily':
-                request += '\t<dailyRecurrence>\r\n'
-                request += '\t\t<timeOfDay>%s</timeOfDay>\r\n' % self.recurrency['time']
-                request += '\t</dailyRecurrence>\r\n'
+            elif self.recurrency.get('type',{}) == 'daily':
+                request += """
+                            <dailyRecurrence>
+                                <timeOfDay>%s</timeOfDay>
+                            </dailyRecurrence>
+                """% self.recurrency['time']
 
-            if self.recurrency.get('type',{}) == 'weekly':
-                request += '\t<weeklyRecurrence>\r\n'
-                request += '\t\t<dayOfWeek>%s</dayOfWeek>\r\n' % self.recurrency['day']
-                request += '\t\t<timeOfDay>%s</timeOfDay>\r\n' % self.recurrency['time']
-                request += '\t</weeklyRecurrence>\r\n'
+            elif self.recurrency.get('type',{}) == 'weekly':
+                request += """
+                        <weeklyRecurrence>
+                            <dayOfWeek>%s</dayOfWeek>
+                            <timeOfDay>%s</timeOfDay>
+                        </weeklyRecurrence>
+                """%(self.recurrency['day'], self.recurrency['time'])
 
-            if self.recurrency.get('type',{}) == 'monthly':
-                request += '\t<monthlyRecurrence>\r\n'
-                request += '\t\t<dayOfMonth>%s</dayOfMonth>\r\n' % self.recurrency['day']
-                request += '\t\t<timeOfDay>%s</timeOfDay>\r\n' % self.recurrency['time']
-                request += '\t</monthlyRecurrence>\r\n'
+            elif self.recurrency.get('type',{}) == 'monthly':
+                request += """
+                        <monthlyRecurrence>
+                            <dayOfMonth>%s</dayOfMonth>
+                            <timeOfDay>%s</timeOfDay>
+                        </monthlyRecurrence>
+                        """%(self.recurrency['day'], self.recurrency['time'])
 
-        self._core_request = request
+        return request
 
     def get(self, filter=None):
         if filter == 'history':
-            return self.connection.send_request('getRecurringJobExecutionHistory', self._core_request)
+            return self.call('getRecurringJobExecutionHistory')
         else:
-            return self.connection.send_request('getRecurringJobs', self._core_request)
+            return self.call('getRecurringJobs')
 
     def delete(self, id):
-        self._modify_core_request('deleteRecurringJob')
+        return self.call('deleteRecurringJob')
 
 
     def _check_recurrence_element( self, type_recurrence, period, timeMonth=None ):
@@ -148,31 +162,34 @@ class RecurringJob(EbayObject):
         self.frequency = None
         return result
 
-    def _set_recurrence( self, timeOf='00:00:00', type_recurrence=None, dayOf=None ):
+    def get_recurrence_params(self, timeOf='00:00:00', type_recurrence=None, dayOf=None ):
         '''
 
         '''
-        self.recurrency={}
-
         if not type_recurrence:
             if isinstance(timeOf, int):
-                self.recurrency = {'type': 'frequency','time': timeOf}
+                return {'type': 'frequency','time': timeOf}
             else:
-                self.recurrency = {'type': 'daily','time': self._check_recurrence_element('time', timeOf) }
+                return {'type': 'daily','time': self._check_recurrence_element('time', timeOf) }
 
         elif type_recurrence and dayOf:
             if type_recurrence == 'weekly':
-                self.recurrency = {'type': 'weekly','day': self._check_recurrence_element('weekly', dayOf) }
-                self.recurrency['time'] = self._check_recurrence_element('time', timeOf)
-
-            if type_recurrence == 'monthly':
-                self.recurrency = {'type': 'monthly','day': self._check_recurrence_element('monthly', dayOf) }
-                self.recurrency['time'] = self._check_recurrence_element('time', timeOf, True) # monthly 'time' has a different format
-
+                return {
+                    'type': 'weekly',
+                    'day': self._check_recurrence_element('weekly', dayOf),
+                    'time': self._check_recurrence_element('time', timeOf),
+                    }
+            
+            elif type_recurrence == 'monthly':
+                return {
+                    'type': 'monthly',
+                    'day': self._check_recurrence_element('monthly', dayOf),
+                    'time': self._check_recurrence_element('time', timeOf, True), # monthly 'time' has a different format
+                    }
         else:
             raise Exception( ">>> 'dayOf' argument is not defined" )
 
-    def create(self, vals):
+    def create(self):
         '''
         vals={'jobType': 'ActiveInventoryReport' / 'FeeSettlementReport' / 'SoldReport',
             'type_recurrence': 'time' or 'monthly' or 'weekly'
@@ -180,16 +197,13 @@ class RecurringJob(EbayObject):
             'day': 'Sunday' up to 'Saturday or Day_1, Day_2 up to Day_last
         }
         '''
-        if vals['jobType']:
-            self.jobType = vals['jobType']
         type_recurrence, day = None, None
 
         # type_recurrence = vals.get('type_recurrence',None)
         # day = vals.get('day',None)
 
-        self._set_recurrence(vals['time'], type_recurrence, day)
-
-        self._modify_core_request('createRecurringJob')
+        self.recurrency = self._get_recurence_params(self.time, type_recurrence, day)
+        return self.call('createRecurringJob')
 
 
 class Job(EbayObject):
@@ -261,10 +275,6 @@ class Connection():
 
         connection = httplib.HTTPSConnection( self.site_host )
 
-        dav.ecrire("POST/" + site_location, 'pyt')
-        dav.ecrire('  req' + str(type(request))+str(request), 'pyt')
-        dav.ecrire('  head' + str(headers), 'pyt')
-
         connection.request( "POST", '/'+site_location, request, headers )
         # print '\nreq', request
 
@@ -300,7 +310,7 @@ class EbayWebService():
         ebay_object = eval(ebay_object_name)(self.connection)
         return ebay_object.get(filter)
 
-    def create(self, ebay_object_name, vals):
+    def create(self, ebay_object_name, params):
         '''
         vals={'jobType': 'ActiveInventoryReport' / 'FeeSettlementReport' / 'SoldReport',
             'type_recurrence': 'time' or 'monthly' or 'weekly'
@@ -308,12 +318,12 @@ class EbayWebService():
             'day': 'Sunday' up to 'Saturday' or 'Day_1' up to 'Day_2' or 'Day_Last'
         }
         '''
-        ebay_object = eval(ebay_object_name)(self.connection)
-        return ebay_object.create(vals)
+        ebay_object = eval(ebay_object_name)(self.connection, params)
+        return ebay_object.create()
 
     def delete(self, ebay_object_name, job_id):
-        ebay_object = eval(ebay_object_name)(self.connection)
-        return ebay_object.delete(id)
+        ebay_object = eval(ebay_object_name)(self.connection, id)
+        return ebay_object.delete()
 
 
     # def update(self, ebay_object_name, id, vals):
