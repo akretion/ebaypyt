@@ -1,0 +1,10 @@
+
+
+     -------  
+POST/BulkDataExchangeService
+
+     -------  
+  req
+
+     -------  
+  head{'X-EBAY-SOA-SERVICE-NAME': 'BulkDataExchangeService', 'X-EBAY-SOA-OPERATION-NAME': 'getRecurringJobs'}

@@ -1,0 +1,4 @@
+ebaypyt
+========
+
+Python Ebay API
