@@ -40,14 +40,14 @@ class EbayObject(object):
         if params:
             for key in params:
                 self.__dict__[key] = params[key]
-    
+
     def build_request(self, action):
         return ''
-    
+
     def call(self, action):
         core_request = self.build_request(action)
         return self.connection.send_request(action, core_request)
-    
+
 class RecurringJob(EbayObject):
     def __init__(self,connection):
         super(RecurringJob, self).__init__(connection)
@@ -67,10 +67,10 @@ class RecurringJob(EbayObject):
 
         elif action == 'getRecurringJobExecutionHistory' :
             request += """
-                    <jobStatus>Completed</jobStatus>
-                    <recurringJobId>%s</recurringJobId>
-                    <startTime>%s</startTime>
-                    <endTime>%s</endTime>
+                <jobStatus>Completed</jobStatus>
+                <recurringJobId>%s</recurringJobId>
+                <startTime>%s</startTime>
+                <endTime>%s</endTime>
             """%(self.jobId, startTime, endTime)
 
         elif action == 'createRecurringJob' :
@@ -79,32 +79,32 @@ class RecurringJob(EbayObject):
                     <downloadJobType>%s</downloadJobType>
                     <UUID>%s</UUID>\n
                 """%(self.jobType, self.get_uuid())
-            
+
             if self.recurrency.get('type',{}) == 'frequency':
                 request += '<frequencyInMinutes>%s</frequencyInMinutes>\n' % self.recurrency['time']
 
             elif self.recurrency.get('type',{}) == 'daily':
                 request += """
-                            <dailyRecurrence>
-                                <timeOfDay>%s</timeOfDay>
-                            </dailyRecurrence>
+                    <dailyRecurrence>
+                        <timeOfDay>%s</timeOfDay>
+                    </dailyRecurrence>
                 """% self.recurrency['time']
 
             elif self.recurrency.get('type',{}) == 'weekly':
                 request += """
-                        <weeklyRecurrence>
-                            <dayOfWeek>%s</dayOfWeek>
-                            <timeOfDay>%s</timeOfDay>
-                        </weeklyRecurrence>
+                    <weeklyRecurrence>
+                        <dayOfWeek>%s</dayOfWeek>
+                        <timeOfDay>%s</timeOfDay>
+                    </weeklyRecurrence>
                 """%(self.recurrency['day'], self.recurrency['time'])
 
             elif self.recurrency.get('type',{}) == 'monthly':
                 request += """
-                        <monthlyRecurrence>
-                            <dayOfMonth>%s</dayOfMonth>
-                            <timeOfDay>%s</timeOfDay>
-                        </monthlyRecurrence>
-                        """%(self.recurrency['day'], self.recurrency['time'])
+                    <monthlyRecurrence>
+                        <dayOfMonth>%s</dayOfMonth>
+                        <timeOfDay>%s</timeOfDay>
+                    </monthlyRecurrence>
+                """%(self.recurrency['day'], self.recurrency['time'])
 
         return request
 
@@ -112,7 +112,7 @@ class RecurringJob(EbayObject):
         if filter == 'history':
             return self.call('getRecurringJobExecutionHistory')
         else:
-            return self.call('getRecurringJobs')
+            return self.call('getRecurringJobs').recurringJobDetail
 
     def delete(self, id):
         return self.call('deleteRecurringJob')
@@ -158,11 +158,9 @@ class RecurringJob(EbayObject):
         else:
             raise Exception( ">>> Recurrency type '%s' has no defined treatment. Allowables type are : 'time', 'dayOfMonth' and 'dayOfWeek'" % (type_recurrence) )
 
-        # frequency and recurrency are incompatible
-        self.frequency = None
         return result
 
-    def get_recurrence_params(self, timeOf='00:00:00', type_recurrence=None, dayOf=None ):
+    def _get_recurrence_params(self, timeOf='00:00:00', type_recurrence=None, dayOf=None ):
         '''
 
         '''
@@ -179,7 +177,7 @@ class RecurringJob(EbayObject):
                     'day': self._check_recurrence_element('weekly', dayOf),
                     'time': self._check_recurrence_element('time', timeOf),
                     }
-            
+
             elif type_recurrence == 'monthly':
                 return {
                     'type': 'monthly',
@@ -312,7 +310,7 @@ class EbayWebService():
 
     def create(self, ebay_object_name, params):
         '''
-        vals={'jobType': 'ActiveInventoryReport' / 'FeeSettlementReport' / 'SoldReport',
+        params={'jobType': 'ActiveInventoryReport' / 'FeeSettlementReport' / 'SoldReport',
             'type_recurrence': 'time' or 'monthly' or 'weekly'
             'time': int (minutes) or HH:MM:SS (hour),
             'day': 'Sunday' up to 'Saturday' or 'Day_1' up to 'Day_2' or 'Day_Last'
@@ -342,4 +340,3 @@ class EbayWebService():
 # GetRecurringJobs
 # GetRecurringJobExecutionHistory
 # DeleteRecurringJob
-

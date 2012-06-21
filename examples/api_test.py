@@ -16,18 +16,22 @@ from lxml import objectify
 sys.path.append('/home/dav/dvp/py/ebay/ebaypyt/lib')
 from ebaypyt import EbayWebService
 
+# ADAPT YOUR PATH HERE
+sys.path.append('/home/dav/dvp/py/ebay')
+import ebay_keys
 
-my_keys = {
-"developer_key"   : "...",
-"application_key" : "...",
-"certificate_key" : "...",
-"auth_token"      : ".........."
-}
+# OR ENABLE THIS DICT
+# ebay_keys = {
+# "developer_key"   : "...",
+# "application_key" : "...",
+# "certificate_key" : "...",
+# "auth_token"      : ".........."
+# }
 
 def pxml(my_object):
     return etree.tostring(recc, pretty_print=True)
 
-ews = EbayWebService(my_keys['developer_key'],my_keys['application_key'],my_keys['certificate_key'],my_keys['auth_token'])
+ews = EbayWebService(ebay_keys['developer_key'],ebay_keys['application_key'],ebay_keys['certificate_key'],ebay_keys['auth_token'])
 
 # recc = ews.get('RecurringJob').recurringJobDetail
 vals={
@@ -36,7 +40,7 @@ vals={
     # 'type_recurrence': 'time' or 'monthly' or 'weekly',
     'type_recurrence': 'time',
     'time': 120
-    # 'day': 'Sunday' up to 'Saturday or Day_1, Day_2 up to Day_last
+    # 'day': 'Sunday' up to 'Saturday or Day_1, Day_2 up to Day_Last
 }
 
 recc = ews.create('RecurringJob', vals)
