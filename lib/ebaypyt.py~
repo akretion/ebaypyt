@@ -279,11 +279,9 @@ class Connection():
         This function complete the build of the request string for the specified 'action' api call
         '''
 
-        prefix  = """
-                <?xml version="1.0" encoding="utf-8"?>
-                <%sRequest xmlns="http://www.ebay.com/marketplace/services">
-                """ % action
-        suffix  = '</%sRequest>' % action
+        prefix  = '<?xml version="1.0" encoding="utf-8"?>\r\n'
+        prefix += '<%sRequest xmlns="http://www.ebay.com/marketplace/services">\r\n' % action
+        suffix  = '</%sRequest>\r\n' % action
 
         return prefix + core_request + suffix
 
