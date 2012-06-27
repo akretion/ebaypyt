@@ -18,40 +18,45 @@ from ebaypyt import EbayWebService
 
 # ADAPT YOUR PATH HERE
 sys.path.append('/home/dav/dvp/py/ebay')
-import ebay_keys
+import ebay_keys as ek
 
 # OR ENABLE THIS DICT
-# ebay_keys = {
-# "developer_key"   : "...",
-# "application_key" : "...",
-# "certificate_key" : "...",
-# "auth_token"      : ".........."
-# }
+# developer_key="..."
+# application_key="..."
+# certificate_key="..."
+# auth_token=".........."
 
 def pxml(my_object):
-    return etree.tostring(recc, pretty_print=True)
+    return etree.tostring(my_object, pretty_print=True)
 
-ews = EbayWebService(ebay_keys['developer_key'],ebay_keys['application_key'],ebay_keys['certificate_key'],ebay_keys['auth_token'])
+ews = EbayWebService(ek.developer_key,ek.application_key,ek.certificate_key,ek.auth_token)
 
 # recc = ews.get('RecurringJob').recurringJobDetail
-vals={
+params={
 # 'jobType': 'ActiveInventoryReport' / 'FeeSettlementReport' / 'SoldReport',
-    'jobType': 'FeeSettlementReport',
+    'jobType': 'ActiveInventoryReport',
     # 'type_recurrence': 'time' or 'monthly' or 'weekly',
-    'type_recurrence': 'time',
-    'time': 120
+    'time': '00:00:20',
+    'type_recurrence': 'monthly',
+    'day': 'Day_Last',
+    # 'type_recurrence': 'weekly',
+    # 'day': 'Tuesday',
     # 'day': 'Sunday' up to 'Saturday or Day_1, Day_2 up to Day_Last
 }
 
-recc = ews.create('RecurringJob', vals)
-# recc = ews.delete('RecurringJob')
-#
-# print pxml(recc)
-reccget = ews.get('RecurringJob').recurringJobDetail
-print [e.tag for e in reccget.getchildren()]
-print [e for e in reccget.getchildren()]
+# recc = ews.create('RecurringJob', params);
+# if recc != False:
+    # print pxml(recc)
+# recc = ews.delete('RecurringJob','5000338700')
 
-# job = ews.get('Job')
-# print dav.getvar(recc, vars())
-# print [e.tag for e in job.getchildren()]
+reccget = ews.get('RecurringJob')
+if reccget != False:
+    print pxml(reccget)
+    print 'head',[e.tag for e in reccget.getchildren()]
+    for res in reccget:
+        print 'data',[e for e in res.getchildren()]
+else:
+    print '    No job recurring'
+
+
 

@@ -20,9 +20,11 @@ import sys
 import gzip
 import uuid
 
-from datetime import date
+
+from datetime import date, datetime
 from lxml import etree
 from lxml import objectify
+
 
 class EbayError(Exception):
      def __init__(self, objectify_value):
@@ -37,22 +39,28 @@ class EbayObject(object):
     def __init__(self, connection, params=None):
         self.connection = connection
         self.get_uuid = uuid.uuid4
+        print params
         if params:
             for key in params:
-                self.__dict__[key] = params[key]
+                if not key in self.__dict__:
+                    self.__dict__[key] = params[key]
 
     def build_request(self, action):
         return ''
 
     def call(self, action):
         core_request = self.build_request(action)
+        print core_request
+        # import pdb; pdb.set_trace()
+
         return self.connection.send_request(action, core_request)
 
+
 class RecurringJob(EbayObject):
-    def __init__(self,connection):
-        super(RecurringJob, self).__init__(connection)
+    def __init__(self,connection, params=None):
+        super(RecurringJob, self).__init__(connection, params)
         self.recurrency={}
-        self.jobId = ''
+
         self.allowable_jobTypes = ('ActiveInventoryReport', 'FeeSettlementReport', 'SoldReport')
 
     def build_request(self, action):
@@ -63,7 +71,7 @@ class RecurringJob(EbayObject):
         request  = ""
 
         if action == 'deleteRecurringJob' :
-            request += '<recurringJobId>%s</recurringJobId>\n' % self.jobId
+            request += '<recurringJobId>%s</recurringJobId>\n' % self.ebay_id
 
         elif action == 'getRecurringJobExecutionHistory' :
             request += """
@@ -112,9 +120,15 @@ class RecurringJob(EbayObject):
         if filter == 'history':
             return self.call('getRecurringJobExecutionHistory')
         else:
-            return self.call('getRecurringJobs').recurringJobDetail
 
-    def delete(self, id):
+            tree = self.call('getRecurringJobs')
+            if 'recurringJobDetail' in [e.tag for e in tree.getchildren()]:
+                # print etree.tostring(tree, pretty_print=True)
+                return self.call('getRecurringJobs').recurringJobDetail
+            else:
+                return False
+
+    def delete(self):
         return self.call('deleteRecurringJob')
 
 
@@ -130,11 +144,11 @@ class RecurringJob(EbayObject):
             try:
                 if timeMonth:
                     time_sent = period
-                    result = time.strptime(time_sent, '%H:%M:%S')
+                    result = datetime.strptime(time_sent, '%H:%M:%S')
                 else:
                     # add '.1Z' suffix to get the required full format '%H:%M:%S.%fZ' with only '%H:%M:%S' given
                     time_sent = period+'.1Z'
-                    result = time.strptime(time_sent, '%H:%M:%S.%fZ')
+                    result = datetime.strptime(time_sent, '%H:%M:%S.%fZ')
             except ValueError:
                 raise Exception( ">>> Given time %s is not in HH:MM:SS time format" % (period ) )
             result = time_sent
@@ -164,6 +178,7 @@ class RecurringJob(EbayObject):
         '''
 
         '''
+
         if not type_recurrence:
             if isinstance(timeOf, int):
                 return {'type': 'frequency','time': timeOf}
@@ -172,6 +187,7 @@ class RecurringJob(EbayObject):
 
         elif type_recurrence and dayOf:
             if type_recurrence == 'weekly':
+                import pdb; pdb.set_trace()
                 return {
                     'type': 'weekly',
                     'day': self._check_recurrence_element('weekly', dayOf),
@@ -196,12 +212,22 @@ class RecurringJob(EbayObject):
         }
         '''
         type_recurrence, day = None, None
+        # import pdb; pdb.set_trace()
+        if self.type_recurrence:
+            type_recurrence = self.type_recurrence
+        if self.day:
+            day = self.day
 
-        # type_recurrence = vals.get('type_recurrence',None)
-        # day = vals.get('day',None)
+        self.recurrency = self._get_recurrence_params(self.time, type_recurrence, day)
 
-        self.recurrency = self._get_recurence_params(self.time, type_recurrence, day)
-        return self.call('createRecurringJob')
+        tree = self.call('createRecurringJob')
+
+        # if tree != False and 'recurringJobId' in [e.tag for e in tree.getchildren()]:
+        if 'recurringJobId' in [e.tag for e in tree.getchildren()]:
+            print etree.tostring(tree, pretty_print=True)
+            return tree.recurringJobId
+        else:
+            return False
 
 
 class Job(EbayObject):
@@ -232,7 +258,7 @@ class Connection():
         self.site_id = site_id
 
 
-    def _generate_headers(self, auth_token, action, site_location):
+    def _generate_headers(self, action, site_location):
         '''
         Creates the base headers that every request needs
         '''
@@ -263,18 +289,24 @@ class Connection():
         Returns the response xml or an error message where appropriate
         '''
 
+        # debug = False
+
         if type_location == 'file':
             site_location = 'FileTransferService'
         else:
             site_location = 'BulkDataExchangeService'
 
         request = self._complete_request(action, core_request)
-        headers = self._generate_headers(self.auth_token, action, site_location)
 
+        headers = self._generate_headers(action, site_location)
+
+        # if debug == True:
+            # print ' req', request
+            # return False
+        # else:
         connection = httplib.HTTPSConnection( self.site_host )
 
         connection.request( "POST", '/'+site_location, request, headers )
-        # print '\nreq', request
 
         response = connection.getresponse()
 
@@ -286,8 +318,10 @@ class Connection():
 
         # remove the chain that produces a poor display in the xml tree during subsequent processing
         web_service_response = web_service_response.replace(' xmlns="http://www.ebay.com/marketplace/services"','')
+
         #transform xml response in objectify xml object
         result = objectify.fromstring(web_service_response)
+        # print etree.tostring(result, pretty_print=True)
 
         # Reads the response. If call is a failure raise an error
         # If call is a success return lxml objectify tree
@@ -316,11 +350,13 @@ class EbayWebService():
             'day': 'Sunday' up to 'Saturday' or 'Day_1' up to 'Day_2' or 'Day_Last'
         }
         '''
+
+        # import pdb; pdb.set_trace()
         ebay_object = eval(ebay_object_name)(self.connection, params)
         return ebay_object.create()
 
-    def delete(self, ebay_object_name, job_id):
-        ebay_object = eval(ebay_object_name)(self.connection, id)
+    def delete(self, ebay_object_name, ebay_id):
+        ebay_object = eval(ebay_object_name)(self.connection, {'ebay_id': ebay_id})
         return ebay_object.delete()
 
 
