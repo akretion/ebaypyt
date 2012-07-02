@@ -426,15 +426,17 @@ class Connection():
         '''
 
         if type_location == 'file':
+            site_host = 'storage.ebay.com'
             site_location = 'FileTransferService'
         else:
             site_location = 'BulkDataExchangeService'
+            site_host = 'webservices.ebay.com'
 
         request = self._complete_request(action, core_request)
         # print request
         headers = self._generate_headers(action, site_location)
         # print headers
-        connection = httplib.HTTPSConnection( self.site_host )
+        connection = httplib.HTTPSConnection(site_host)
 
         connection.request( "POST", '/'+site_location, request, headers )
         print "POST", '/'+site_location, request, headers
