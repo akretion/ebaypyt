@@ -20,17 +20,19 @@ import sys
 import gzip
 import uuid
 
-
 from datetime import date, datetime
 from lxml import etree
 from lxml import objectify
 
+ALLOWABLE_JOB_TYPES = ('ActiveInventoryReport', 'FeeSettlementReport', 'SoldReport')
+ALLOWABLE_JOB_STATUS = ('Aborted', 'Completed', 'Created', 'Failed', 'InProcess', 'Scheduled')
+
 
 def objectify_to_dict(xml_objectify, cast_fields=None, useless_key=None):
     '''
-        :xml_objectify : an objectify object that represente an xml
-        :cast_fields :dictionnary that can force the type of each value return
-        :useless_key : if a parent key is in this list and if this parent key have
+        :params xml_objectify objectity: an objectify object that represente an xml
+        :params cast_fields dict: dictionnary that can force the type of each value return
+        :params useless_key list: if a parent key is in this list and if this parent key have
             for value a dictionnary with only one key.
             The parent key will be drop and only the child key will be visible in the response
     '''
@@ -70,19 +72,16 @@ class EbayObject(object):
     def build_request(self, action, params=None):
         return ''
 
-    def call(self, action, params=None):
+    def call(self, action, params=None, type_location=None):
         core_request = self.build_request(action, params=params)
-        print core_request
         # import pdb; pdb.set_trace()
-
-        return self.connection.send_request(action, core_request)
+        return self.connection.send_request(action, core_request, type_location=type_location)
 
 
 class RecurringJob(EbayObject):
     def __init__(self, connection, params=None):
         super(RecurringJob, self).__init__(connection, params)
         self.recurrency={}
-        self.allowable_jobTypes = ('ActiveInventoryReport', 'FeeSettlementReport', 'SoldReport')
 
     def build_request(self, action, params):
         '''
@@ -103,7 +102,7 @@ class RecurringJob(EbayObject):
             """%(params['jobId'], params['startTime'], params['endTime'])
 
         elif action == 'createRecurringJob' :
-            if params['jobType'] in self.allowable_jobTypes:
+            if params['jobType'] in ALLOWABLE_JOB_TYPES:
                 request += """
                     <downloadJobType>%s</downloadJobType>
                     <UUID>%s</UUID>
@@ -208,7 +207,7 @@ class RecurringJob(EbayObject):
 
         elif type_recurrence and dayOf:
             if type_recurrence == 'weekly':
-                import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
                 return {
                     'type': 'weekly',
                     'day': self._check_recurrence_element('weekly', dayOf),
@@ -234,12 +233,12 @@ class RecurringJob(EbayObject):
         '''
         type_recurrence, day = None, None
         # import pdb; pdb.set_trace()
-        if self.type_recurrence:
-            type_recurrence = self.type_recurrence
-        if self.day:
-            day = self.day
+        if params.get('type_recurrence'):
+            type_recurrence = params.get('type_recurrence')
+        if params.get('day'):
+            day = params.get('day')
 
-        params['recurrency'] = self._get_recurrence_params(self.time, type_recurrence, day)
+        params['recurrency'] = self._get_recurrence_params(params.get('time'), type_recurrence, day)
 
         tree = self.call('createRecurringJob', params)
 
@@ -251,8 +250,79 @@ class RecurringJob(EbayObject):
             return False
 
 class Job(EbayObject):
-    def get(self, filter=None):
-        return self.connection.send_request('getJobs', self._core_request)
+    '''
+    1 getRecurrJobHist
+    2
+    '''
+    def __init__(self, connection, params=None):
+        super(Job, self).__init__(connection, params)
+
+    def build_request(self, action, params):
+        '''
+        This function builds the request string for the specifies 'action' api call
+        '''
+
+        request  = ""
+
+        if action == 'downloadFile':
+            if params.get('taskReferenceId') and params.get('fileReferenceId'):
+                request += '\n<taskReferenceId>%s</taskReferenceId>'%params['taskReferenceId']
+                request += '\n<fileReferenceId>%s</fileReferenceId>'%params['fileReferenceId']
+            else:
+                raise Exception( "'taskReferenceId' 'or 'fileReferenceId' is not defined : verify it : %s" \
+                    %str(params))
+        # elif action == 'getRecurringJobExecutionHistory':
+            # if params.get('recurringJobId'):
+                # request += '\n\t<recurringJobId>%s</recurringJobId>'%params['recurringJobId']
+            # elif params.get('startTime'):
+                # request += '\n\t<startTime>%s</startTime>'%params['startTime']
+            # elif params.get('endTime'):
+                # request += '\n\t<endTime>%s</endTime>'%params['endTime']
+
+        # elif action == 'getRecurringJobExecutionStatus':
+            # if params.get('recurringJobId'):
+                # request += '\n\t<recurringJobId>%s</recurringJobId>'%params['recurringJobId']
+
+        elif action == 'getJobs':
+            if params.get('jobType'):
+                if params['jobType'] in ALLOWABLE_JOB_TYPES:
+                    request += '\n\t<jobType>%s</jobType>'%params['jobType']
+                else:
+                    raise Exception( "jobType '%s' is not correct: use one of these %s" \
+                        %params['jobType'], str(ALLOWABLE_JOB_TYPES))
+            if params.get('jobStatus'):
+                if params['jobStatus'] in ALLOWABLE_JOB_STATUS:
+                    request += '\n\t<jobStatus>%s</jobStatus>'%params['jobStatus']
+                else:
+                    raise Exception( "jobStatus '%s' is not correct: use one of these %s" \
+                        %params['jobStatus'], str(ALLOWABLE_JOB_STATUS))
+
+        return request
+
+
+    def download(self, params):
+        ''' '''
+        return self.call('downloadFile', params, 'file')
+
+    def get(self, params=None):
+        # tree = self.call('getRecurringJobExecutionHistory', params)
+        # if 'jobProfile' in [e.tag for e in tree.getchildren()]:
+            # return self.call('getRecurringJobExecutionHistory').jobProfile
+        # else:
+            # return False
+        # tree = self.call('getRecurringJobExecutionStatus', params)
+        # if 'jobProfile' in [e.tag for e in tree.getchildren()]:
+            # return self.call('getRecurringJobExecutionStatus').jobProfile
+        # else:
+            # return False
+
+        tree = self.call('getJobs', params)
+        # import pdb; pdb.set_trace()
+        if 'jobProfile' in [e.tag for e in tree.getchildren()]:
+            xml_dict = objectify_to_dict(tree, {'jobProfile': list})
+            return xml_dict['jobProfile']
+        else:
+            return False
 
 
 class Connection():
@@ -296,13 +366,57 @@ class Connection():
         This function complete the build of the request string for the specified 'action' api call
         '''
 
-        prefix  = """
-                <?xml version="1.0" encoding="utf-8"?>
-                <%sRequest xmlns="http://www.ebay.com/marketplace/services">
-                """ % action
-        suffix  = '</%sRequest>' % action
+        prefix  = """<?xml version="1.0" encoding="utf-8"?>
+<%sRequest xmlns="http://www.ebay.com/marketplace/services">""" % action
+        suffix  = '''
+</%sRequest>
+''' % action
 
         return prefix + core_request + suffix
+
+
+    def _parse_download(self):
+        '''
+        Parses the response string returned by the eBay server and separates the information
+        into two parts: the xml response part and zipfile part
+        '''
+        result = objectify.fromstring(self.web_service_response)
+
+        if result.ack == "Failure":
+            raise EbayError(result)
+
+        start_xml = self._response.find( '<?xml')
+        end_xml = self._response.find( '\r\n--MIME')
+        self.download_xml = self._response[start_xml:end_xml]
+
+        print 'download_xml', self.download_xml
+        #Find boundary string
+        boundary = self.web_service_response.splitlines()[0]
+
+        #Find the ending boundary index
+        find = self.web_service_response.find( "Content-ID:" )
+
+        find = self.web_service_response.find( '\r\n', find )
+
+        #Find start of middle boundary
+        middle_boundary = self.web_service_response.find( boundary, find )
+
+        #XML response from downloadFile
+        response = self.web_service_response[find:middle_boundary].strip()
+        print 'hiiiiiiiiiiiiii', self.web_service_response.find( find, middle_boundary )
+        #Find next boundary
+        find = self.web_service_response.find( "Content-ID:", middle_boundary )
+        find = self.web_service_response.find( '\r\n', find )
+        find_end = self.web_service_response.find( boundary, find )
+
+        #Extract the compressed data and write it to file
+        datas = self.web_service_response[find:find_end]
+        print 'ty', type(datas)
+        # fp = open( 'data_responses.zip', 'wb' )
+        # fp.write( datas )
+        # fp.close()
+
+        return datas
 
 
     def send_request(self, action, core_request, type_location='site'):
@@ -311,44 +425,45 @@ class Connection():
         Returns the response xml or an error message where appropriate
         '''
 
-        # debug = False
-
         if type_location == 'file':
             site_location = 'FileTransferService'
         else:
             site_location = 'BulkDataExchangeService'
 
         request = self._complete_request(action, core_request)
-        print request
+        # print request
         headers = self._generate_headers(action, site_location)
-
-        # if debug == True:
-            # print ' req', request
-            # return False
-        # else:
+        # print headers
         connection = httplib.HTTPSConnection( self.site_host )
 
         connection.request( "POST", '/'+site_location, request, headers )
-
+        print "POST", '/'+site_location, request, headers
         response = connection.getresponse()
 
         if response.status != 200:
             raise Exception( "Error %s sending request: %s" % (response.status, response.reason ) )
 
-        web_service_response = response.read()
+        self.web_service_response = response.read()
         connection.close()
 
         # remove the chain that produces a poor display in the xml tree during subsequent processing
-        web_service_response = web_service_response.replace(' xmlns="http://www.ebay.com/marketplace/services"','')
+        self.web_service_response = self.web_service_response.replace(' xmlns="http://www.ebay.com/marketplace/services"','')
+        print self.web_service_response
 
-        #transform xml response in objectify xml object
-        result = objectify.fromstring(web_service_response)
-        # print etree.tostring(result, pretty_print=True)
+        if type_location == 'file':
+            print 'JE SUIIS ICI'
+            result = _parse_download()
+        else:
+            print 'JE SUIIS LA'
+            # print etree.tostring(web_service_response, pretty_print=True)
+            #transform xml response in objectify xml object
+            result = objectify.fromstring(self.web_service_response)
 
         # Reads the response. If call is a failure raise an error
         # If call is a success return lxml objectify tree
         if result.ack == "Failure":
             raise EbayError(result)
+
         return result
 
 
@@ -364,6 +479,10 @@ class EbayWebService():
         ebay_object = eval(ebay_object_name)(self.connection)
         return ebay_object.get(params)
 
+    def download(self, ebay_object_name, params=None):
+        ebay_object = Job(self.connection)
+        return ebay_object.download(params)
+
     def create(self, ebay_object_name, params):
         '''
         params={'jobType': 'ActiveInventoryReport' / 'FeeSettlementReport' / 'SoldReport',
@@ -378,6 +497,10 @@ class EbayWebService():
     def delete(self, ebay_object_name, ebay_id):
         ebay_object = eval(ebay_object_name)(self.connection)
         return ebay_object.delete(ebay_id)
+
+    def search(self, ebay_object_name, params=None):
+        ebay_object = eval(ebay_object_name)(self.connection)
+        return ebay_object.search(params)
 
     # def update(self, ebay_object_name, id, vals):
         # ebay_object = eval(ebay_object_name)(self.connection)
