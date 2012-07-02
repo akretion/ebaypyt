@@ -49,14 +49,14 @@ params={
     # print pxml(recc)
 # recc = ews.delete('RecurringJob','5000339200')
 
-# reccget = ews.get('RecurringJob')
-# if reccget != False:
-    # print pxml(reccget)
-    # print 'head',[e.tag for e in reccget.getchildren()]
-    # for res in reccget:
-        # print 'data',[e for e in res.getchildren()]
-# else:
-    # print '    No job recurring'
+reccget = ews.get('RecurringJob')
+if reccget != False:
+    print pxml(reccget)
+    print 'head',[e.tag for e in reccget.getchildren()]
+    for res in reccget:
+        print 'data',[e for e in res.getchildren()]
+else:
+    print '    No job recurring'
 
 # print '\n\n\n----------Jobs'
 params = {
@@ -83,9 +83,10 @@ params = {
 
 print '\n\n----------File'
 # import pdb; pdb.set_trace()
-down = ews.download('Job', params)
-print 'type',type(down)
-fp = open( 'data_resp.zip', 'wb' )
-fp.write( down )
-fp.close()
+# down = ews.download('Job', params)
+# print 'type',type(down)
+# fp = open( 'data_resp.zip', 'wb' )
+# fp.write( down )
+# fp.close()
+# print 'api_test ebaypyt ended'
 

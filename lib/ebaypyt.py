@@ -95,45 +95,46 @@ class RecurringJob(EbayObject):
 
         elif action == 'getRecurringJobExecutionHistory' :
             request += """
-                <jobStatus>Completed</jobStatus>
-                <recurringJobId>%s</recurringJobId>
-                <startTime>%s</startTime>
-                <endTime>%s</endTime>
+        <jobStatus>Completed</jobStatus>
+        <recurringJobId>%s</recurringJobId>
+        <startTime>%s</startTime>
+        <endTime>%s</endTime>
             """%(params['jobId'], params['startTime'], params['endTime'])
 
         elif action == 'createRecurringJob' :
             if params['jobType'] in ALLOWABLE_JOB_TYPES:
                 request += """
-                    <downloadJobType>%s</downloadJobType>
-                    <UUID>%s</UUID>
+        <downloadJobType>%s</downloadJobType>
+        <UUID>%s</UUID>
                 """%(params['jobType'], self.get_uuid())
 
             recurrency_type = params['recurrency'].get('type')
 
             if recurrency_type == 'frequency':
-                request += '<frequencyInMinutes>%s</frequencyInMinutes>' % params['recurrency']['time']
+                request += '''
+        <frequencyInMinutes>%s</frequencyInMinutes>''' % params['recurrency']['time']
 
             elif recurrency_type == 'daily':
                 request += """
-                    <dailyRecurrence>
-                        <timeOfDay>%s</timeOfDay>
-                    </dailyRecurrence>
+        <dailyRecurrence>
+            <timeOfDay>%s</timeOfDay>
+        </dailyRecurrence>
                 """% params['recurrency']['time']
 
             elif recurrency_type == 'weekly':
                 request += """
-                    <weeklyRecurrence>
-                        <dayOfWeek>%s</dayOfWeek>
-                        <timeOfDay>%s</timeOfDay>
-                    </weeklyRecurrence>
+        <weeklyRecurrence>
+            <dayOfWeek>%s</dayOfWeek>
+            <timeOfDay>%s</timeOfDay>
+        </weeklyRecurrence>
                 """%(params['recurrency']['day'], params['recurrency']['time'])
 
             elif recurrency_type == 'monthly':
                 request += """
-                    <monthlyRecurrence>
-                        <dayOfMonth>%s</dayOfMonth>
-                        <timeOfDay>%s</timeOfDay>
-                    </monthlyRecurrence>
+        <monthlyRecurrence>
+            <dayOfMonth>%s</dayOfMonth>
+            <timeOfDay>%s</timeOfDay>
+        </monthlyRecurrence>
                 """%(params['recurrency']['day'], params['recurrency']['time'])
 
         return request
@@ -207,7 +208,6 @@ class RecurringJob(EbayObject):
 
         elif type_recurrence and dayOf:
             if type_recurrence == 'weekly':
-                # import pdb; pdb.set_trace()
                 return {
                     'type': 'weekly',
                     'day': self._check_recurrence_element('weekly', dayOf),
@@ -218,7 +218,8 @@ class RecurringJob(EbayObject):
                 return {
                     'type': 'monthly',
                     'day': self._check_recurrence_element('monthly', dayOf),
-                    'time': self._check_recurrence_element('time', timeOf, True), # monthly 'time' has a different format
+                    # monthly 'time' has a different format
+                    'time': self._check_recurrence_element('time', timeOf, True),
                     }
         else:
             raise Exception( ">>> 'dayOf' argument is not defined" )
@@ -403,7 +404,6 @@ class Connection():
 
         #XML response from downloadFile
         response = self.web_service_response[find:middle_boundary].strip()
-        print 'hiiiiiiiiiiiiii', self.web_service_response.find( find, middle_boundary )
         #Find next boundary
         find = self.web_service_response.find( "Content-ID:", middle_boundary )
         find = self.web_service_response.find( '\r\n', find )
@@ -411,7 +411,7 @@ class Connection():
 
         #Extract the compressed data and write it to file
         datas = self.web_service_response[find:find_end]
-        print 'ty', type(datas)
+
         # fp = open( 'data_responses.zip', 'wb' )
         # fp.write( datas )
         # fp.close()
@@ -451,10 +451,8 @@ class Connection():
         print self.web_service_response
 
         if type_location == 'file':
-            print 'JE SUIIS ICI'
             result = _parse_download()
         else:
-            print 'JE SUIIS LA'
             # print etree.tostring(web_service_response, pretty_print=True)
             #transform xml response in objectify xml object
             result = objectify.fromstring(self.web_service_response)
@@ -511,10 +509,6 @@ class EbayWebService():
 # StartUploadJob
 # GetJobStatus
 # AbortJob
-# GetJobs
-# DownloadFile
 # StartDownloadJob
-# CreateRecurringJob
-# GetRecurringJobs
 # GetRecurringJobExecutionHistory
-# DeleteRecurringJob
+
