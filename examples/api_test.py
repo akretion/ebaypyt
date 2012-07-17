@@ -5,9 +5,8 @@
 
 """
 
-import os, os.path
 import sys
-import uuid
+
 # from datetime import date
 from lxml import etree
 from lxml import objectify
@@ -31,10 +30,24 @@ def pxml(my_object):
 
 ews = EbayWebService(ek.developer_key,ek.application_key,ek.certificate_key,ek.auth_token)
 
-# recc = ews.get('RecurringJob').recurringJobDetail
+
+# uncomment each block to test them
+
+#  *********       ------------       *********
+print '\n\n        ------- Recurring Job getting -------  '
+# Display defined recurring jobs if exists
+mget = ews.get('RecurringJob')
+if mget != False:
+    print '   >>> recurring jobs:', mget
+else:
+    print '   >>> No recurring jobs'
+
+
+#  *********       ------------       *********
+print '\n\n        ------- Recurring Job creation -------  '
 params={
 # 'jobType': 'ActiveInventoryReport' / 'FeeSettlementReport' / 'SoldReport',
-    'jobType': 'ActiveInventoryReport',
+    'jobType': 'SoldReport',
     # 'type_recurrence': 'time' or 'monthly' or 'weekly',
     'time': '00:00:20',
     'type_recurrence': 'monthly',
@@ -43,22 +56,25 @@ params={
     # 'day': 'Tuesday',
     # 'day': 'Sunday' up to 'Saturday or Day_1, Day_2 up to Day_Last
 }
-
 # recc = ews.create('RecurringJob', params);
 # if recc != False:
-    # print pxml(recc)
-# recc = ews.delete('RecurringJob','5000339200')
+    # print '   >>> recurring jobs created:', recc
+# else:
+    # print '   >>> No created recurring jobs'
 
-reccget = ews.get('RecurringJob')
-if reccget != False:
-    print pxml(reccget)
-    print 'head',[e.tag for e in reccget.getchildren()]
-    for res in reccget:
-        print 'data',[e for e in res.getchildren()]
-else:
-    print '    No job recurring'
 
-# print '\n\n\n----------Jobs'
+#  *********       ------------       *********
+# print '\n\n        ------- Recurring Job deletion -------  '
+# Give a valid value
+# recc = ews.delete('RecurringJob','5000133101')
+# if recc != False:
+    # print '   >>> recurring jobs deleted:', recc
+# else:
+    # print '   >>> No deleting recurring jobs'
+
+
+#  *********       ------------       *********
+print '\n\n        ------- Jobs getting informations -------  '
 params = {
     'jobStatus': 'Completed',
     # 'jobType': 'ActiveInventoryReport',
@@ -67,6 +83,7 @@ params = {
 # jobs = ews.get('Job', params)
 # if jobs != False:
     # print '  response:', jobs
+    #Jobs ar returned in xml format
     # print pxml(jobs)
     # print 'head',[e.tag for e in jobs.getchildren()]
     # import pdb; pdb.set_trace()
@@ -75,18 +92,40 @@ params = {
 # else:
     # print '    No jobs'
 
+
+
+
+
+#  *********       ------------       *********
+print '\n\n        ------- Download job file-------  '
+
 params = {
-    'taskReferenceId': '5048817014',
-    'fileReferenceId': '5045749674',
+    'taskReferenceId': '5045798294',
+    'fileReferenceId': '5042581944',
 }
-
-
-print '\n\n----------File'
-# import pdb; pdb.set_trace()
-# down = ews.download('Job', params)
-# print 'type',type(down)
-# fp = open( 'data_resp.zip', 'wb' )
-# fp.write( down )
-# fp.close()
+# file_downloaded_datas = ews.download('Job', params)
+#
+# #display the 500th first and the 500 last
+# print file_downloaded_datas[:500], '\n\n...\n\n'
+# print file_downloaded_datas[-500:]
+#
 # print 'api_test ebaypyt ended'
 
+
+
+
+
+
+#  *********       ------------       *********
+print '\n\n        ------- Product getting informations ------- '
+#
+# params = {
+    # 'ItemID': '260874940015',
+    # 'DetailLevel': 'ItemReturnAttributes',
+# }
+
+# product = ews.get('Product', params)
+# if product != False:
+    # print '\n\n  response:', product[0]
+# else:
+    # print '\n\n   No product'
