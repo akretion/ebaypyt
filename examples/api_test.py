@@ -119,13 +119,13 @@ params = {
 #  *********       ------------       *********
 print '\n\n        ------- Product getting informations ------- '
 #
-# params = {
-    # 'ItemID': '260874940015',
-    # 'DetailLevel': 'ItemReturnAttributes',
-# }
+params = {
+    'ItemID': '260874940015',
+    'DetailLevel': 'ItemReturnAttributes',
+}
 
-# product = ews.get('Product', params)
-# if product != False:
-    # print '\n\n  response:', product[0]
-# else:
-    # print '\n\n   No product'
+product = ews.get('Product', params)
+if product != False:
+    print '\n\n  response:', product[0]
+else:
+    print '\n\n   No product'

@@ -22,11 +22,11 @@
 #                                                                             #
 ###############################################################################
 """
-    Ebay-py is a library for Python to interact with the Ebay's Web Service API.
+    Ebay-py is a library for Python to interact with the Ebay's Web Service APIS.
 
     Credits :
-    Thanks to Wesley Hansen for eBay-LMS-API
-    (https://github.com/...)
+    Thanks to Wesley Hansen for eBay-LMS-APIS
+    (https://github.com/wrhansen/eBay-LMS-APIS)
     from which I also inspired my library.
 """
 
@@ -34,9 +34,6 @@ __author__ = "Sébastien BEAU / David BEAL"
 __date__ = "2012-07-17"
 
 import httplib
-# import simplejson
-# import os, os.path
-# import sys
 import uuid
 import zipfile
 import tempfile
@@ -44,18 +41,18 @@ from datetime import date, datetime
 from lxml import etree
 from lxml import objectify
 
-# Documentation define another report but api alerts 'JobType 'FeeSettlementReport' is unsupported'
 ALLOWABLE_JOB_TYPES = ('ActiveInventoryReport', 'SoldReport')
+# Documentation define another report but api alerts "JobType 'FeeSettlementReport' is unsupported"
 ALLOWABLE_JOB_STATUS = ('Aborted', 'Completed', 'Created', 'Failed', 'InProcess', 'Scheduled')
 
-SITES = {'api': {'host': 'api.ebay.com', 'location': 'ws/api.dll'} ,
+APIS = {'api': {'host': 'api.ebay.com', 'location': 'ws/api.dll'} ,
     'web': {'host': 'webservices.ebay.com', 'location': 'BulkDataExchangeService'} ,
     'file': {'host': 'storage.ebay.com', 'location': 'FileTransferService'} ,
     }
 
 SUCCESS_TAG = {'api':'Ack', 'web': 'ack', 'file': 'ack'}
 
-API_COMPATIBILITY_LEVEL = 781
+APIS_COMPATIBILITY_LEVEL = 781
 
 def objectify_to_dict(xml_objectify, cast_fields=None, useless_key=None):
     '''
@@ -116,7 +113,7 @@ class EbayObject(object):
         """
         return ''
 
-    def call(self, action, site, params=None):
+    def call(self, action, api, params=None):
         """
         Generics processing for all chidren object
         USE IT in each child class
@@ -126,7 +123,7 @@ class EbayObject(object):
         :return: specfic xml string used to build request
         """
         core_request = self.build_request(action, params=params)
-        return self.connection.web_service_processing(action, core_request, site=site)
+        return self.connection.web_service_processing(action, core_request, api=api)
 
     def download(self, params):
         print "'download' method should be only used with 'Job' object "
@@ -134,16 +131,16 @@ class EbayObject(object):
     def create(self, params):
         print "'create' method should be only used with 'RecurringJob' object "
 
-    def get(self, web_service_request, site, xml_tag, params=None):
+    def get(self, web_service_request, api, xml_tag, params=None):
         """
         method to access informations about object with web service
         :param str web_service_request: request name
-        :param str site: site type used by this api call service
+        :param str api: api type used by this api call service
         :param str xml_tag: xml response's tag inside is the main useful information
         :rtype: dict
         :return: web service response in a dictionary
         """
-        tree = self.call(web_service_request, site, params=params)
+        tree = self.call(web_service_request, api, params=params)
 
         if xml_tag in [e.tag for e in tree.getchildren()]:
             xml_dict = objectify_to_dict(tree, {xml_tag: list})
@@ -260,10 +257,10 @@ class RecurringJob(EbayObject):
     def _get_recurrence_params(self, timeOf='00:00:00', type_recurrence=None, dayOf=None ):
         """
 
-        :param str timeOf: minutes or hour/minute/second parameter
+        :param str timeOf: minutes or hour/minute/second
         :param str type_recurrence: None/Weekly/Monthly
         :rtype: dict
-        :return: well formed element to build xml reccuring job request
+        :return: well formed elements to build xml reccuring job request
         """
 
         if not type_recurrence:
@@ -325,9 +322,7 @@ class Job(EbayObject):
         super(Job, self).__init__(connection, params)
 
     def build_request(self, action, params):
-        """
-        see EbayObject.build_request() docstring
-        """
+        """ see EbayObject.build_request() docstring """
         request  = ""
 
         if action == 'downloadFile':
@@ -369,7 +364,7 @@ class Job(EbayObject):
 
 class Product(EbayObject):
     """
-    Tasks management of recurring/cron tasks defined by RecurringJob class
+    Trading Api use : only GetItem for now
     """
 
     def __init__(self, connection, params=None):
@@ -379,9 +374,7 @@ class Product(EbayObject):
         return ">>> Missing %s key to build xml request " % (attr)
 
     def build_request(self, action, params):
-        """
-        see EbayObject.build_request() docstring
-        """
+        """ see EbayObject.build_request() docstring """
 
         request = ""
 
@@ -404,6 +397,12 @@ class Product(EbayObject):
         return request
 
     def get(self, params=None):
+        """
+        GetItem implementation
+        :param dict params: {'ItemID': '123456789...', 'DetailLevel': 'ItemReturnAttributes'}
+        :rtype: dict
+        :return: informations about the product
+        """
         return super(Product, self).get('GetItem', 'api', 'Item', params)
 
 
@@ -428,12 +427,12 @@ class Communication():
         self.compatibility = compatibility
 
 
-    def _generate_headers(self, action, service_location, site):
+    def _generate_headers(self, action, service_location, api):
         """
         Creates headers to each request
         :param str action: processing type to execute
-        :param str service: web service location
-        :param str site: site type used by this api call service
+        :param str service_location: web service location
+        :param str api: api type used by this api call service
         :rtype: dict
         :return: dictionnay with all the header keys
         """
@@ -441,8 +440,8 @@ class Communication():
         headers={}
         headers['Content-Type'] = 'text/xml'
 
-        if site == 'api':
-            headers['X-EBAY-API-COMPATIBILITY-LEVEL'] = API_COMPATIBILITY_LEVEL
+        if api == 'api':
+            headers['X-EBAY-API-COMPATIBILITY-LEVEL'] = APIS_COMPATIBILITY_LEVEL
             headers['X-EBAY-API-DEV-NAME'] = self.developer_key
             headers['X-EBAY-API-APP-NAME'] = self.application_key
             headers['X-EBAY-API-CERT-NAME'] = self.certificate_key
@@ -456,27 +455,24 @@ class Communication():
         return headers
 
 
-    def _complete_request(self, action, core_request, site):
+    def _complete_request(self, action, core_request, api):
         """
         This function complete the build of the request string for the specified 'action' api call
         :param str action: processing type to execute
         :param str core_request: body of the request
-        :param str site: site type used by this api call service
+        :param str api: api type used by this api call service
         :rtype: str
         :return: xml well formed request string
         """
-        # LMS API
+        # LMS APIS
         self.xlmns = 'http://www.ebay.com/marketplace/services'
 
-        # Trading API case
-        if site == 'api':
+        # Trading APIS case
+        if api == 'api':
             self.xlmns = 'urn:ebay:apis:eBLBaseComponents'
 
-        prefix  = """<?xml version="1.0" encoding="utf-8"?>
-<%sRequest xmlns="%s">""" % (action, self.xlmns)
-        suffix  = '''
-</%sRequest>
-''' % action
+        prefix  = '<?xml version="1.0" encoding="utf-8"?>\n<%sRequest xmlns="%s">' % (action, self.xlmns)
+        suffix  = '\n</%sRequest>' % action
 
         return prefix + core_request + suffix
 
@@ -528,7 +524,7 @@ class Communication():
         return datas
 
 
-    def web_service_processing(self, action, core_request, site):
+    def web_service_processing(self, action, core_request, api):
         """
         Connects to eBay server, and HTTPS POSTs the request with the given headers
         :param str action: processing type to execute
@@ -537,15 +533,14 @@ class Communication():
         :return: xml string if 'downloadFile' action or lxml.objectify xml response
         """
 
-        request = self._complete_request(action, core_request, site)
+        request = self._complete_request(action, core_request, api)
 
-        headers = self._generate_headers(action, SITES[site]['location'], site)
+        headers = self._generate_headers(action, APIS[api]['location'], api)
 
-        connection = httplib.HTTPSConnection(SITES[site]['host'])
+        connection = httplib.HTTPSConnection(APIS[api]['host'])
 
-        connection.request( "POST", '/'+SITES[site]['location'], request, headers )
-
-        print request
+        connection.request( "POST", '/'+APIS[api]['location'], request, headers )
+        # print request
         response = connection.getresponse()
 
         if response.status != 200:
@@ -556,17 +551,17 @@ class Communication():
 
         # remove the chain that produces a poor display in the xml tree during subsequent processing
         self.web_service_response = self.web_service_response.replace(' xmlns="'+ self.xlmns +'"','')
-        print 'web_service_response"', action, '":', self.web_service_response
+        print 'web_service_response "', action, '" :', self.web_service_response
 
-        if site != 'file':
+        if api != 'file':
             # print etree.tostring(web_service_response, pretty_print=True)
             #transform xml response in objectify xml object
             result = objectify.fromstring(self.web_service_response)
 
             # Reads the response. If call is a failure raise an error
             # If call is a success return lxml objectify tree
-            # print result.__dict__(
-            if (result.__dict__[SUCCESS_TAG[site]] == "Failure"):
+            import pdb; pdb.set_trace()
+            if (result.__dict__[SUCCESS_TAG[api]] == "Failure"):
                 raise EbayError(result)
         else:
             # if self.web_service_response contains download datas file
@@ -574,7 +569,7 @@ class Communication():
 
             xml_objectify = objectify.fromstring(self.xml_response_download)
             # import pdb; pdb.set_trace()
-            if xml_objectify.__dict__(SUCCESS_TAG[site]) == "Failure":
+            if xml_objectify.__dict__(SUCCESS_TAG[api]) == "Failure":
                 raise EbayError(xml_objectify)
 
         return result
@@ -606,10 +601,4 @@ class EbayWebService():
     # def update(self, ebay_object_name, id, vals):
         # return eval(ebay_object_name)(self.connection).update(filter)
 
-# CreateUploadJob
-# UploadFile
-# StartUploadJob
-# GetJobStatus
-# AbortJob
-# GetRecurringJobExecutionHistory
 
