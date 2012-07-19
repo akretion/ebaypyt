@@ -37,7 +37,7 @@ import httplib
 import uuid
 import zipfile
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from lxml import etree
 from lxml import objectify
 
@@ -53,6 +53,10 @@ APIS = {'api': {'host': 'api.ebay.com', 'location': 'ws/api.dll'} ,
 SUCCESS_TAG = {'api':'Ack', 'web': 'ack', 'file': 'ack'}
 
 APIS_COMPATIBILITY_LEVEL = 781
+
+ZULU_STRING = 'T00:00:00Z'
+
+HISTORIC_DAYS_MAX = 27
 
 def objectify_to_dict(xml_objectify, cast_fields=None, useless_key=None):
     '''
@@ -100,7 +104,43 @@ class EbayObject(object):
     def __init__(self, connection, params):
         self.connection = connection
         self.unique_execution_ID = uuid.uuid4()
+        # self.params = params
 
+    def _update_params_value(self, key, new_value):
+        """
+        Modify self.params dict
+        :param str key: self.params key
+        :param str new_value: value to insert in self.params if key exists
+        :rtype: None
+        :return: None
+        """
+        value = self.params.get(key, None)
+        if value:
+            self.params[key] = new_value
+
+    def build_xml_tag(self, tag, mandatory=False, allowables=None, default=None):
+        """
+        Build a complete xml tag : <my_tag>my_value</my_tag>
+        :param str tag: xml tag
+        :param boolean mandatory: indicate if tag must be generate
+        :param list allowables: list of allowed values
+        :param str default: default value if not exist in self.params
+        :rtype: str
+        :return: xml completed tag
+        """
+        value = self.params.get(tag, None)
+        if mandatory == True and not value:
+            if default:
+                value = default
+            else:
+                raise Exception("Missing '%s' tag. It is a mandatory tag for this xml api call, please add it to provided parameters" % tag)
+        if value:
+            if allowables and value not in allowables:
+                raise Exception("'%s' is not correct : use one of these values %s" % \
+                                                                        (value, str(allowables)))
+            return '\n\t<%s>%s</%s>' % (tag, value, tag)
+        else:
+            return ''
 
     def build_request(self, action, params=None):
         """
@@ -159,6 +199,7 @@ class RecurringJob(EbayObject):
         ''' see EbayObject.build_request() docstring '''
 
         request  = ""
+        self.params = params
 
         if action == 'deleteRecurringJob' :
             request += """
@@ -167,11 +208,7 @@ class RecurringJob(EbayObject):
         elif action == 'createRecurringJob' :
             request += """
     <UUID>%s</UUID>""" % self.unique_execution_ID
-            if params['jobType'] in ALLOWABLE_JOB_TYPES:
-                request += """
-    <downloadJobType>%s</downloadJobType>"""% params['jobType']
-            else:
-                raise Exception( ">>> Missing 'jobType' key to build xml request" )
+            request += self.build_xml_tag('jobType', allowables=ALLOWABLE_JOB_TYPES)
 
             recurrency_type = params['recurrency'].get('type')
 
@@ -311,7 +348,6 @@ class RecurringJob(EbayObject):
         tree = self.call('createRecurringJob', 'web', params)
 
         if 'recurringJobId' in [e.tag for e in tree.getchildren()]:
-            print etree.tostring(tree, pretty_print=True)
             return tree.recurringJobId.text
         else:
             return False
@@ -324,28 +360,36 @@ class Job(EbayObject):
     def build_request(self, action, params):
         """ see EbayObject.build_request() docstring """
         request  = ""
+        self.params = params
 
         if action == 'downloadFile':
-            if params.get('taskReferenceId') and params.get('fileReferenceId'):
-                request += '\n<taskReferenceId>%s</taskReferenceId>'%params['taskReferenceId']
-                request += '\n<fileReferenceId>%s</fileReferenceId>'%params['fileReferenceId']
-            else:
-                raise Exception( "'taskReferenceId' 'or 'fileReferenceId' is not defined : verify it : %s" \
-                    %str(params))
+            request += self.build_xml_tag('taskReferenceId', mandatory=True)
+            request += self.build_xml_tag('fileReferenceId', mandatory=True)
 
         elif action == 'getJobs':
-            if params.get('jobType'):
-                if params['jobType'] in ALLOWABLE_JOB_TYPES:
-                    request += '\n\t<jobType>%s</jobType>'%params['jobType']
-                else:
-                    raise Exception( "jobType '%s' is not correct: use one of these %s" \
-                        %params['jobType'], str(ALLOWABLE_JOB_TYPES))
-            if params.get('jobStatus'):
-                if params['jobStatus'] in ALLOWABLE_JOB_STATUS:
-                    request += '\n\t<jobStatus>%s</jobStatus>'%params['jobStatus']
-                else:
-                    raise Exception( "jobStatus '%s' is not correct: use one of these %s" \
-                        %params['jobStatus'], str(ALLOWABLE_JOB_STATUS))
+            request += self.build_xml_tag('jobType', allowables=ALLOWABLE_JOB_TYPES)
+            request += self.build_xml_tag('jobStatus', allowables=ALLOWABLE_JOB_STATUS)
+
+            param_key = 'creationTimeFrom'
+
+            # check params[param_key]
+            new_value = self.params.get(param_key)
+            if not new_value:
+                new_value, self.params[param_key] = str(HISTORIC_DAYS_MAX), str(HISTORIC_DAYS_MAX)
+            else:
+                new_value = str(new_value)
+            if new_value.isdigit() and int(new_value) > 0 and int(new_value) <= HISTORIC_DAYS_MAX:
+                new_value = int(new_value)
+            else:
+                raise Exception("parameter '%s' = %s is not valid a number of days (between 1 and %s). Please modify it" % \
+                                                    (param_key, new_value, HISTORIC_DAYS_MAX))
+
+            # transform number of days in datetime UTC
+            new_value = (date.today() + \
+                timedelta(-int(self.params[param_key]))).isoformat() + ZULU_STRING
+            self.params[param_key] = new_value
+
+            request += self.build_xml_tag(param_key)
 
         return request
 
@@ -370,23 +414,25 @@ class Product(EbayObject):
     def __init__(self, connection, params=None):
         super(Product, self).__init__(connection, params)
 
-    def message_except(self, attr):
-        return ">>> Missing %s key to build xml request " % (attr)
+    # def message_except(self, attr):
+        # return ">>> Missing %s key to build xml request " % (attr)
 
     def build_request(self, action, params):
         """ see EbayObject.build_request() docstring """
 
         request = ""
+        self.params = params
 
         if action == 'GetItem':
-            mandatory_attr = 'ItemID'
-            if not params.get(mandatory_attr) :
-                raise Exception( self.message_except(mandatory_attr) )
+            request += self.build_xml_tag('ItemID', True)
+            # mandatory_attr = 'ItemID'
+            # if not params.get(mandatory_attr) :
+                # raise Exception( self.message_except(mandatory_attr) )
 
-            for attr in [mandatory_attr, 'DetailLevel']:
-                if params.get(attr) :
-                    request += '\n\t<%(attr)s>%(attr_id)s</%(attr)s>' % \
-                                                            {'attr': attr, 'attr_id': params[attr]}
+            # for attr in [mandatory_attr, 'DetailLevel']:
+                # if params.get(attr) :
+                    # request += '\n\t<%(attr)s>%(attr_id)s</%(attr)s>' % \
+                                                            # {'attr': attr, 'attr_id': params[attr]}
 
             request += '''
     <RequesterCredentials>
@@ -485,12 +531,11 @@ class Communication():
         :return: xml string
         """
 
-        # import pdb; pdb.set_trace()
         start_xml = self.web_service_response.find( '<?xml')
         end_xml = self.web_service_response.find( '--MIME', start_xml)
-        # TODO delete > suffix
+
         self.xml_response_download = self.web_service_response[start_xml:end_xml]
-        #print 'xml_response_download',self.xml_response_download
+
         #Find boundary string
         boundary = self.web_service_response.splitlines()[0]
 
@@ -540,7 +585,6 @@ class Communication():
         connection = httplib.HTTPSConnection(APIS[api]['host'])
 
         connection.request( "POST", '/'+APIS[api]['location'], request, headers )
-        # print request
         response = connection.getresponse()
 
         if response.status != 200:
@@ -551,25 +595,21 @@ class Communication():
 
         # remove the chain that produces a poor display in the xml tree during subsequent processing
         self.web_service_response = self.web_service_response.replace(' xmlns="'+ self.xlmns +'"','')
-        print 'web_service_response "', action, '" :', self.web_service_response
 
         if api != 'file':
-            # print etree.tostring(web_service_response, pretty_print=True)
             #transform xml response in objectify xml object
             result = objectify.fromstring(self.web_service_response)
 
             # Reads the response. If call is a failure raise an error
             # If call is a success return lxml objectify tree
-            import pdb; pdb.set_trace()
             if (result.__dict__[SUCCESS_TAG[api]] == "Failure"):
                 raise EbayError(result)
         else:
             # if self.web_service_response contains download datas file
             result = self._parse_download()
-
             xml_objectify = objectify.fromstring(self.xml_response_download)
-            # import pdb; pdb.set_trace()
-            if xml_objectify.__dict__(SUCCESS_TAG[api]) == "Failure":
+
+            if xml_objectify.__dict__[SUCCESS_TAG[api]] == "Failure":
                 raise EbayError(xml_objectify)
 
         return result

@@ -36,11 +36,11 @@ ews = EbayWebService(ek.developer_key,ek.application_key,ek.certificate_key,ek.a
 #  *********       ------------       *********
 print '\n\n        ------- Recurring Job getting -------  '
 # Display defined recurring jobs if exists
-mget = ews.get('RecurringJob')
-if mget != False:
-    print '   >>> recurring jobs:', mget
-else:
-    print '   >>> No recurring jobs'
+# mget = ews.get('RecurringJob')
+# if mget != False:
+    # print '   >>> recurring jobs:', mget
+# else:
+    # print '   >>> No recurring jobs'
 
 
 #  *********       ------------       *********
@@ -77,55 +77,47 @@ params={
 print '\n\n        ------- Jobs getting informations -------  '
 params = {
     'jobStatus': 'Completed',
+    'creationTimeFrom': '64',  # in days in past
     # 'jobType': 'ActiveInventoryReport',
 }
 
 # jobs = ews.get('Job', params)
 # if jobs != False:
-    # print '  response:', jobs
-    #Jobs ar returned in xml format
-    # print pxml(jobs)
-    # print 'head',[e.tag for e in jobs.getchildren()]
-    # import pdb; pdb.set_trace()
-    # for res in jobs:
-        # print 'data',[e for e in res.getchildren()]
+    # print jobs[0].keys()
+    # for e in jobs:
+        # print e
 # else:
     # print '    No jobs'
-
-
-
 
 
 #  *********       ------------       *********
 print '\n\n        ------- Download job file-------  '
 
 params = {
-    'taskReferenceId': '5045798294',
-    'fileReferenceId': '5042581944',
+    'taskReferenceId': '5047690844',
+    'fileReferenceId': '5044580764',
 }
-# file_downloaded_datas = ews.download('Job', params)
-#
-# #display the 500th first and the 500 last
-# print file_downloaded_datas[:500], '\n\n...\n\n'
-# print file_downloaded_datas[-500:]
-#
-# print 'api_test ebaypyt ended'
-
-
+file_downloaded_datas = ews.download('Job', params)
+# #
+#display the 500th first and the 500 last
+print file_downloaded_datas[:500], '\n\n...\n\n'
+print file_downloaded_datas[-500:]
+# #
+print 'api_test ebaypyt ended'
 
 
 
 
 #  *********       ------------       *********
 print '\n\n        ------- Product getting informations ------- '
-#
+
 params = {
     'ItemID': '260874940015',
     'DetailLevel': 'ItemReturnAttributes',
 }
 
-product = ews.get('Product', params)
-if product != False:
-    print '\n\n  response:', product[0]
-else:
-    print '\n\n   No product'
+# product = ews.get('Product', params)
+# if product != False:
+    # print '\n\n  response:', product[0]
+# else:
+    # print '\n\n   No product'
