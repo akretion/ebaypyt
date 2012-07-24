@@ -11,8 +11,6 @@ import sys
 from lxml import etree
 from lxml import objectify
 
-# ADAPT YOUR PATH HERE
-sys.path.append('/home/dav/dvp/py/ebay/ebaypyt/lib')
 from ebaypyt import EbayWebService
 
 # ADAPT YOUR PATH HERE AND CREATE 'ebay_keys.py' file ...
