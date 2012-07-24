@@ -1,5 +1,5 @@
 build
 dist
-prestapyt.egg-info
+ebaypyt.egg-info
 *~
 *.pyc
