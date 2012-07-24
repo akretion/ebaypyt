@@ -31,7 +31,8 @@
 """
 
 __author__ = "Sébastien BEAU / David BEAL"
-__date__ = "2012-07-17"
+__version__ = "0.2.0"
+__date__ = "2012-07-24"
 
 import httplib
 import uuid
@@ -43,6 +44,7 @@ from lxml import objectify
 
 ALLOWABLE_JOB_TYPES = ('ActiveInventoryReport', 'SoldReport')
 # Documentation define another report but api alerts "JobType 'FeeSettlementReport' is unsupported"
+
 ALLOWABLE_JOB_STATUS = ('Aborted', 'Completed', 'Created', 'Failed', 'InProcess', 'Scheduled')
 
 APIS = {'api': {'host': 'api.ebay.com', 'location': 'ws/api.dll'} ,
@@ -108,7 +110,7 @@ class EbayObject(object):
 
     def _update_params_value(self, key, new_value):
         """
-        Modify self.params dict
+        Modify self.params dict : NOT USED FOR NOW
         :param str key: self.params key
         :param str new_value: value to insert in self.params if key exists
         :rtype: None
@@ -145,7 +147,7 @@ class EbayObject(object):
     def build_request(self, action, params=None):
         """
         This function builds the request string for the specifies 'action' api call
-        USE IT in each child class
+        Must be overwritten in each child class
         :param str action: action name request
         :param dict params: parameters needed to build specific request
         :rtype: str
@@ -414,9 +416,6 @@ class Product(EbayObject):
     def __init__(self, connection, params=None):
         super(Product, self).__init__(connection, params)
 
-    # def message_except(self, attr):
-        # return ">>> Missing %s key to build xml request " % (attr)
-
     def build_request(self, action, params):
         """ see EbayObject.build_request() docstring """
 
@@ -425,14 +424,7 @@ class Product(EbayObject):
 
         if action == 'GetItem':
             request += self.build_xml_tag('ItemID', True)
-            # mandatory_attr = 'ItemID'
-            # if not params.get(mandatory_attr) :
-                # raise Exception( self.message_except(mandatory_attr) )
-
-            # for attr in [mandatory_attr, 'DetailLevel']:
-                # if params.get(attr) :
-                    # request += '\n\t<%(attr)s>%(attr_id)s</%(attr)s>' % \
-                                                            # {'attr': attr, 'attr_id': params[attr]}
+            request += self.build_xml_tag('DetailLevel')
 
             request += '''
     <RequesterCredentials>
@@ -634,11 +626,3 @@ class EbayWebService():
 
     def delete(self, ebay_object_name, ebay_id):
         return eval(ebay_object_name)(self.connection).delete(ebay_id)
-
-    # def search(self, ebay_object_name, params=None):
-        # return eval(ebay_object_name)(self.connection).search(params)
-
-    # def update(self, ebay_object_name, id, vals):
-        # return eval(ebay_object_name)(self.connection).update(filter)
-
-
