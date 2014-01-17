@@ -10,11 +10,9 @@ Download prestapyt as a .tar.gz or .zip from here (https://github.com/Akretion/e
     python setup.py install
 
 #Usage
-TODO
+see example folder
 
 #API Documentation
-TODO
-#Credits:
 TODO
 
 #Copyright and License
